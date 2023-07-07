@@ -94,7 +94,41 @@ router.post('/inventarios', (req, res) => {
     })
 })
 
+// post data from productos and values for default in inventarios 
 
+router.post('/productos', (req, res) => {
+    let data = req.body; 
+    let data_values = Object.values(data);   
+    let insertProducts = /* sql */ `INSERT INTO productos (id, nombre, descripcion, estado, creado_por, actualizado_por, creado_en, actualizado_en, eliminado_en)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `; 
+    if(Object.entries(data).length <= 0) {
+        res.status(500).json({"message": "El body no tiene información, por favor envie datos!!"});
+    }else {
+        if(data['id']) {
+            if(data['id'] == data_values[0]) {
+                let countInitial = 1;
+                let whatWareHouses = /* sql */ `SELECT b.id FROM bodegas AS b`;
+                connection.query(whatWareHouses, (err, arr) => {
+                    if(err) res.send(err);
+                    else {
+                        let ids = Object.values(arr);
+                        let randomIDWareHouse = ids[Math.floor(Math.random() * ids.length)]
+                        let insertValueDefault = /* sql */ `INSERT INTO inventarios ()`;
+                    }
+                } ) 
+                let warehouse = /* sql */ `SELECT b.nombre FROM bodegas AS b WHERE id = ?`;
+                // connection.query(insertProducts, data_values, (err, progress) => {
+                //     if(err) res.send(err);
+                //     else res.status(200).json({"message": "Los datos se enviaron correctamente!!"}); 
+                // })
+            }else {
+                res.status(500).send({"message": "la id que esta enviando no esta en el lugar correcto"});
+            }
+        }
+    }
+    
+})
 
 // post data from the warehouses table 
 router.post('/bodegas', (req, res) => {
