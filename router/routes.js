@@ -31,6 +31,7 @@ router.get('/productosOrden', (req, res) => {
              )
          ) AS Bodega
     FROM productos AS p
+    GROUP BY Producto
     HAVING Total IS NOT NULL 
     ORDER BY Total DESC`;
     connection.query(query, (err, progress) => err ? res.send(err) : res.json(progress));
@@ -45,7 +46,7 @@ router.post('/inventarios', (req, res) => {
         if(err) res.send(err)
         else {
             if(Object.entries(data).length <= 0 || data_values.length == 0) {
-                res.status(500).send({"message": "Por favor envie data"});
+                res.status(500).send({"message": "El body no tiene información, por favor envie datos!!"});
             }else {
                 if(data_values.length <= 2 || Object.entries(data).length <= 2){
                     res.status(500).send({"message": "La data esta incompleta"})
@@ -106,26 +107,51 @@ router.post('/productos', (req, res) => {
         res.status(500).json({"message": "El body no tiene información, por favor envie datos!!"});
     }else {
         if(data['id']) {
-            if(data['id'] == data_values[0]) {
-                let countInitial = 1;
-                let whatWareHouses = /* sql */ `SELECT b.id FROM bodegas AS b`;
-                connection.query(whatWareHouses, (err, arr) => {
-                    if(err) res.send(err);
-                    else {
-                        let ids = Object.values(arr);
-                        let randomIDWareHouse = ids[Math.floor(Math.random() * ids.length)]
-                        let insertValueDefault = /* sql */ `INSERT INTO inventarios ()`;
-                    }
-                } ) 
-                let warehouse = /* sql */ `SELECT b.nombre FROM bodegas AS b WHERE id = ?`;
-                // connection.query(insertProducts, data_values, (err, progress) => {
-                //     if(err) res.send(err);
-                //     else res.status(200).json({"message": "Los datos se enviaron correctamente!!"}); 
-                // })
-            }else {
-                res.status(500).send({"message": "la id que esta enviando no esta en el lugar correcto"});
-            }
-        }
+            if(data['id'] == data_values[0] && Object.entries(data_values).length == 9) {
+                let non_compliant = false; 
+                  if(typeof data["nombre"] != "string" || typeof data["descripcion"] != "string" || typeof data["estado"] != "number" || typeof data["id"] != "number") {
+                    non_compliant = !non_compliant;
+                }
+                if(non_compliant) {
+                    res.status(500).send({"message": "algunos campos no cumplen con el tipo de dato"})
+                }else {
+                   let whatWareHouses = /* sql */ `SELECT b.id FROM bodegas AS b`;
+                   connection.query(insertProducts, data_values, (err, progress) => {
+                        if(err) {
+                            err.errno == 1062 ? res.status(500).send({"message": "La id esta duplicada, envia otra!!"}) : res.send(err);
+                        }else {
+                            connection.query(whatWareHouses, (err, arr) => {
+                                if(err) res.send(err);
+                                else {
+                                    let amountInitial = Math.floor(Math.random() * 100);                   
+                                    let ids = Object.values(arr);
+                                    // select random warehouse
+                                    let randomIDWareHouse = ids[Math.floor(Math.random() * ids.length)];
+                                    let convertId = parseInt(JSON.stringify(randomIDWareHouse["id"]))
+                                    // create Random Id
+                                    let randomIDI = ""; 
+                                    for(let i = 0; i < 5; i++){
+                                        let charactersId = Math.floor(Math.random() * 10);
+                                        randomIDI += charactersId.toString(); 
+                                    }
+                                    let valuesDefault = [parseInt(randomIDI), convertId, data_values[0], amountInitial] 
+                                    let insertValueDefault = /* sql */ `INSERT INTO inventarios (id, id_bodega, id_producto, cantidad) VALUES (?, ?, ?, ?)`;
+                                    connection.query(insertValueDefault, valuesDefault, (err, results) => {
+                                        if(err) res.send(err)
+                                        else {
+                                            res.status(200).send({"message": "Los datos se enviaron correctamente"}); 
+                                        }                                        
+                                    } )
+                                }
+                            } ) 
+                        }; 
+                    })
+                }
+            }else if(Object.entries(data_values).length < 9) res.status(500).send({"message": "La informacion que mando esta incompleta!"}); 
+            
+            else res.status(500).send({"message": "la id que esta enviando no esta en el lugar correcto"});
+            
+        }else res.status(500).send({"message": "El registro no contiene una ID, envia una ID!!"}); 
     }
     
 })
