@@ -12,7 +12,7 @@ router.get('/bodegas', (req, res) => {
 })
 
 // Get data from the products in order specific for Store or WareHouse
-router.get('/productosOrden', (req, res) => {
+router.get('/productos/orden', (req, res) => {
     let query = /* sql */`
     SELECT p.nombre AS Producto,
             (
@@ -155,6 +155,85 @@ router.post('/productos', (req, res) => {
     }
     
 })
+
+// post data in table productos for move of warehouse  
+router.post('/productos/move', (req, res) => {
+    let data = req.body;
+    let searchAmount = /* sql */ `
+        SELECT b.id AS id, 
+               i.cantidad AS total, 
+               p.nombre AS producto,
+               p.id AS id_producto
+        FROM inventarios AS i 
+        INNER JOIN bodegas AS b ON i.id_bodega = b.id  
+        INNER JOIN productos AS p ON i.id_producto = p.id 
+        ORDER BY Total DESC
+    `;
+
+    if(Object.entries(data).length == 0) {
+        res.status(500).send({"message": "El body no tiene información, por favor envie datos!!"})
+    }else {
+        if(data["producto"]){
+            res.status(500).send({"message": "la data debe contener la id del producto, no el nombre!!"})
+        }else{
+            if(Object.entries(data).length < 4) res.status(500).send({"message": "La data esta incompleta!"})
+            else {
+                connection.query(searchAmount, (err, results) => {
+                   let coincidenceWarehouseExist = false
+                   let non_destinyWarehouseExist = false
+                   let non_propertyWarehouseExist = false; 
+                   let countElderJust = false
+                   let options = ["id", "bodega_id", "destino_bodega_id", "cantidad"];
+                   
+                   for(let property in results) {
+                        for(let x = 0; x < options.length; x++){
+                            let prop = options[x]; 
+                            if(data[prop] == undefined) {
+                                non_propertyWarehouseExist = true
+                                break;
+                            }
+                        }
+                        if(data["bodega_id"] == results[property].id && data["id"] == results[property].id_producto) { 
+                            coincidenceWarehouseExist = true
+                            if(data["cantidad"] <= results[property].total) countElderJust = true
+                        }
+
+                        if(data["destino_bodega_id"] == results[property].id) {
+                            non_destinyWarehouseExist = true 
+                        }
+                   }  
+                   
+                   if(non_propertyWarehouseExist) res.status(500).send({"message": "Lea la documentación para el nombre de las llaves de la data!"}) 
+                   else if(coincidenceWarehouseExist) {
+                        if(non_destinyWarehouseExist) {
+                            if(countElderJust) {
+                                let updaterDataProductStore = [data['cantidad'], data['id'], data["bodega_id"]];
+                                let updateRegisterProduct = /* sql */ `UPDATE inventarios SET cantidad = cantidad - ? WHERE id_producto = ? AND id_bodega = ?`
+                                connection.query(updateRegisterProduct, updaterDataProductStore, (err, results) => {
+                                    if(err) res.status(500).send(err)
+                                    else {
+                                       let updaterDataWarehouse = [data['cantidad'], data['id'], data['destino_bodega_id']];
+                                       let updateWarehouse = /* sql */ `UPDATE inventarios SET cantidad = cantidad + ? WHERE id_producto = ? AND id_bodega = ?`
+                                       connection.query(updateWarehouse, updaterDataWarehouse, (err) => {
+                                           err ? res.status(500).send(err) : res.status(200).send({"message": "los datos se transladaron correctamente", "status": 200}) 
+                                       })
+                                    }
+                                })
+                            }else {
+                                res.status(500).send({"message": "La cantidad que se envio es mayor a la que se registro en la base de datos!"})
+                            }
+                        }else {
+                            res.status(500).send({"message": "la bodega destino no tiene existencia!, ingresa una correcta"})
+                        }
+
+                   }else res.status(500).send({"message": "La bodega no existe, ingrese una bodega existente"}); 
+                })
+            }
+        }
+    }
+
+})
+
 
 // post data from the warehouses table 
 router.post('/bodegas', (req, res) => {
