@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { customAlphabet } from "nanoid";
 import connection from "../config/database.js";
 
 let router = Router();
@@ -244,6 +245,7 @@ router.post("/productos/move", (req, res) => {
   let data = req.body;
   let searchAmount = /* sql */ `
         SELECT b.id AS id, 
+               i.id AS id_inventario,
                i.cantidad AS total, 
                p.nombre AS producto,
                p.id AS id_producto
@@ -275,6 +277,8 @@ router.post("/productos/move", (req, res) => {
           let non_destinyWarehouseExist = false;
           let non_propertyWarehouseExist = false;
           let countElderJust = false;
+          let productExistInWarehouse = false; 
+          let historyIdInventory = Number(); 
           let options = ["id", "bodega_id", "destino_bodega_id", "cantidad"];
 
           for (let property in results) {
@@ -294,6 +298,14 @@ router.post("/productos/move", (req, res) => {
                 countElderJust = true;
             }
 
+            if (
+              results[property].id == data["destino_bodega_id"] &&
+              results[property].id_producto == data["id"]
+            ) {
+              productExistInWarehouse = true
+              historyIdInventory = results[property].id_inventario
+            }
+
             if (data["destino_bodega_id"] == results[property].id) {
               non_destinyWarehouseExist = true;
             }
@@ -309,42 +321,71 @@ router.post("/productos/move", (req, res) => {
           else if (coincidenceWarehouseExist) {
             if (non_destinyWarehouseExist) {
               if (countElderJust) {
-                let updaterDataProductStore = [
-                  data["cantidad"],
-                  data["id"],
-                  data["bodega_id"],
-                ];
-                let updateRegisterProduct = /* sql */ `UPDATE inventarios SET cantidad = cantidad - ? WHERE id_producto = ? AND id_bodega = ?`;
-                connection.query(
-                  updateRegisterProduct,
-                  updaterDataProductStore,
-                  (err, results) => {
-                    if (err) res.status(500).send(err);
-                    else {
-                      let updaterDataWarehouse = [
-                        data["cantidad"],
-                        data["id"],
-                        data["destino_bodega_id"],
-                      ];
-                      let updateWarehouse = /* sql */ `UPDATE inventarios SET cantidad = cantidad + ? WHERE id_producto = ? AND id_bodega = ?`;
-                      connection.query(
-                        updateWarehouse,
-                        updaterDataWarehouse,
-                        (err) => {
-                          err
-                            ? res.status(500).send(err)
-                            : res
-                                .status(200)
-                                .send({
-                                  message:
-                                    "los datos se transladaron correctamente",
-                                  status: 200,
-                                });
-                        }
-                      );
+                if (productExistInWarehouse) {
+                  let updaterDataProductStore = [
+                    data["cantidad"],
+                    data["id"],
+                    data["bodega_id"],
+                  ];
+                  let updateRegisterProduct = /* sql */ `UPDATE inventarios SET cantidad = cantidad - ? WHERE id_producto = ? AND id_bodega = ?`;
+                  connection.query(
+                    updateRegisterProduct,
+                    updaterDataProductStore,
+                    (err, results) => {
+                      if (err) res.status(500).send(err);
+                      else {
+                        let updaterDataWarehouse = [
+                          data["cantidad"],
+                          data["id"],
+                          data["destino_bodega_id"],
+                        ];
+                        let updateWarehouse = /* sql */ `UPDATE inventarios SET cantidad = cantidad + ? WHERE id_producto = ? AND id_bodega = ?`;
+                        connection.query(
+                          updateWarehouse,
+                          updaterDataWarehouse,
+                          (err) => {
+                            if (err) {
+                              res
+                                .status(500)
+                                .send(err)
+                            } else {
+                               let generateId = customAlphabet('0123456789', 5); 
+                               let randomIDHistory = generateId(); 
+                               let insertHistory = /* sql */ `INSERT INTO historiales (id, cantidad, id_bodega_origen, id_bodega_destino, id_inventario) VALUES (?, ?, ?, ?, ?)`;
+                               let insertDataHistory = [
+                                  randomIDHistory, 
+                                  data["cantidad"], 
+                                  data["bodega_id"], 
+                                  data["destino_bodega_id"], 
+                                  historyIdInventory];
+                               connection.query(
+                                insertHistory, 
+                                insertDataHistory, 
+                                (err) => {
+                                  err 
+                                      ? res.status(500).send(err)
+                                      : res
+                                          .status(200)
+                                          .send({
+                                              message: "los datos se transladaron correctamente",
+                                              status: 200,
+                                      });
+                                 })
+                            }
+                          }
+                        );
+                      }
                     }
-                  }
-                );
+                  );
+                } else {
+                    res 
+                      .status(500)
+                      .send({
+                        message: "El producto que seleccionaste no existe dentro de esa bodega destino!"
+                      })
+                }
+              
+                 
               } else {
                 res
                   .status(500)
