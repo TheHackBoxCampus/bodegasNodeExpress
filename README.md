@@ -73,8 +73,16 @@ Para la conexion se utilizan variables de entorno para administrar credenciales
 Para su uso se configura el archivo .env
 
 ```markdown
-config={...data}
+SERVER={"hostname": "...", "port": "..."}
+
+CONNECT={"host": "...", "user": "...", "password": "#", "database": "..."}
 ```
+- Para que los puntos de acceso no tengan errores y pueda ejecutar las operaciones de forma correcta, debes quitarle el ``.example`` al ``.env`` es decir el archivo debe quedar en la raiz ``/`` de tu proyecto con el nombre ``.env``
+
+```markdown
+.env.example => X
+.env => ✔ 
+``` 
 - En el archivo database importas la libreria `` dotevn `` para el reconocimiento de las variables definidas con anterioridad
 
 - importas mysql para efectuar la conexión
